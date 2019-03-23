@@ -8,19 +8,13 @@
 #include <fcntl.h> 
 #include <linux/spi/spidev.h>
 #include <sys/ioctl.h>
-#include <pthread.h>
-#include "pltf_spi.h"
-#include "st_errno.h"
+//#include <pthread.h>
+//#include "pltf_spi.h"
+//#include "st_errno.h"
+#include "../inc/ioctl_spi_comms.h"
 
-/*
- ******************************************************************************
- * DEFINES
- ******************************************************************************
- */
-#define SPI_MODE_CONFIG		SPI_MODE_1
-#define SPI_BITS_PER_WORD	8
-#define SPI_MAX_FREQ		6000000
-#define ARRAY_SIZE(a)		(sizeof(a) / sizeof(a[0]))
+
+//#define ARRAY_SIZE(a)		(sizeof(a) / sizeof(a[0]))
 
 /*
  ******************************************************************************
@@ -32,7 +26,7 @@ static const char *device = "/dev/spidev0.0";
 static int fd = 0;
 static int isSPIInit = 0;
 /* Lock to serialize SPI communication */
-static pthread_mutex_t lockCom;
+//static pthread_mutex_t lockCom;
 
 /*
  ******************************************************************************
@@ -73,14 +67,6 @@ ReturnCode spi_init(void)
 		printf("Error: setting SPI frequency\n");
 		goto error;
  	}
-
-	ret = pthread_mutex_init(&lockCom, NULL);
-	if (ret != 0)
-	{
-		printf("Error: mutex init to protect SPI communication is failed\n");
-		goto error;
-	}
-
 	
 	isSPIInit = 1;
 	return ERR_NONE;
@@ -94,7 +80,6 @@ HAL_statusTypeDef spiTxRx(const uint8_t *txData, uint8_t *rxData, uint8_t length
 {  
 	
 	int ret = 0;
-	int i;
 
 	/* check if SPI init is done */
 	if (!isSPIInit) {
@@ -102,10 +87,8 @@ HAL_statusTypeDef spiTxRx(const uint8_t *txData, uint8_t *rxData, uint8_t length
 		return	HAL_ERROR;
 	}
 
-	/* lock for atomic SPI transaction */
-	//pthread_mutex_lock(&lock);
-
 	struct spi_ioc_transfer transfer;
+	// ensure the structure is empty to start with
 	memset(&transfer, 0, sizeof(struct spi_ioc_transfer));
 
 	if (txData)
@@ -123,23 +106,9 @@ HAL_statusTypeDef spiTxRx(const uint8_t *txData, uint8_t *rxData, uint8_t length
 	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &transfer);
 	if (ret < 0) {
 		printf("Error: SPI error in data transfer=%d\n",ret);
-		/* Unlock the mutex before returning from error case */
-		//pthread_mutex_unlock(&lock);
 		return HAL_ERROR;
 	}
-
-	/* Unlock the mutex */
-	//pthread_mutex_unlock(&lock);
 
 	return HAL_OK;
 }
 
-void pltf_protect_com(void)
-{
-	pthread_mutex_lock(&lockCom);
-}
-
-void pltf_unprotect_com(void)
-{
-	pthread_mutex_unlock(&lockCom);
-}
